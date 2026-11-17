@@ -1,7 +1,7 @@
 import mlflow
 
 from src.monitor_drift import check_data_drift
-from retrain_pipeline import (
+from src.retrain_pipeline import (
     train_and_register_model,
     run_pipeline,
 )
