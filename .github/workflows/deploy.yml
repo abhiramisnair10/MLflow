@@ -30,7 +30,6 @@ steps:
       test -f requirements.txt
       test -f Dockerfile
       test -d tests
-      echo "Project folder verified successfully."
 
   - name: Install Dependencies
     run: |
@@ -52,8 +51,3 @@ steps:
     run: |
       docker images
       docker image inspect iris-mlops-api:latest
-
-  - name: Build Completed
-    run: |
-      echo "All tests passed."
-      echo "Docker image built successfully."
