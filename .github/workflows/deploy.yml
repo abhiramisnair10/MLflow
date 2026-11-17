@@ -1,8 +1,10 @@
-name: Continuous Integration & Deployment
+name: Continuous Integration and Deployment
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -15,18 +17,23 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
+
+      - name: Check Project Folder
+        run: |
+          pwd
+          ls -la
+          ls -la MLOps-demo
 
       - name: Install Dependencies
-        working-directory: ./MLOps-demo
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r MLOps-demo/requirements.txt
-          
+
       - name: Run Tests
-      run: |
-        python -m pytest MLOps-demo/tests/ -v
-        
+        run: |
+          python -m pytest MLOps-demo/tests/ -v
+
       - name: Build Docker Image
-      run: |
-         docker build -t iris-mlops:latest MLOps-demo/
+        run: |
+          docker build -t iris-mlops:latest MLOps-demo/
