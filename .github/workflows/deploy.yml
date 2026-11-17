@@ -23,7 +23,7 @@ jobs:
         run: |
           pwd
           ls -la
-          ls -la MLOps-demo
+          find . -maxdepth 3 -type f -name "requirements.txt"
 
       - name: Install Dependencies
         run: |
