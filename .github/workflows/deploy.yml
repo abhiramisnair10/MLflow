@@ -2,11 +2,15 @@ name: Continuous Integration & Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: MLOps-demo
 
     steps:
       - name: Checkout Repository
@@ -20,13 +24,10 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r MLOps-demo/requirements.txt
+          pip install -r requirements.txt
 
       - name: Run Tests
-        run: |
-          cd MLOps-demo
-          pytest tests/
+        run: pytest tests/ -v
 
       - name: Build Docker Image
-        run: |
-          docker build -t iris-mlops-api:latest MLOps-demo
+        run: docker build -t iris-mlops-api:latest .
