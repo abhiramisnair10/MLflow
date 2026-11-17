@@ -27,13 +27,14 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r MLOps-demo/requirements.txt
+          cd MLOps-demo 
+          pip install -r requirements.txt
 
       - name: Run Tests
         run: |
-          python -m pytest MLOps-demo/tests/ -v
+          cd MLOps-demo
+          pytest tests/ 
 
       - name: Build Docker Image
         run: |
-          docker build -t iris-mlops:latest MLOps-demo/
+          docker build -t iris-mlops-api:latest ./ MLOps-demo/
