@@ -25,7 +25,6 @@ steps:
 
   - name: Check Project Folder
     run: |
-      echo "Checking project directory..."
       pwd
       ls -la
       test -f requirements.txt
