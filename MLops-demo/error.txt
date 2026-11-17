@@ -1,0 +1,754 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\abhir\project\v1\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\abhir\project\MLops-demo
+plugins: anyio-4.16.0, Faker-40.54.0
+collecting ... collected 1 item
+
+tests/test_retrain.py::test_train_and_register_model_execution FAILED    [100%]
+
+================================== FAILURES ===================================
+___________________ test_train_and_register_model_execution ___________________
+
+sk_model = RandomForestClassifier(max_depth=5, random_state=42)
+output_path = 'C:\\Users\\abhir\\AppData\\Local\\Temp\\tmpd3s14cfq\\model\\model.skops'
+serialization_format = 'skops', skops_trusted_types = None
+
+    def _save_model(sk_model, output_path, serialization_format, skops_trusted_types):
+        """
+        Args:
+            sk_model: The scikit-learn model to serialize.
+            output_path: The file path to which to write the serialized model.
+            serialization_format: The format in which to serialize the model. This should be one of
+                the following: ``mlflow.sklearn.SERIALIZATION_FORMAT_PICKLE`` or
+                ``mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE``.
+            skops_trusted_types: A list of trusted types when loading model that is saved as
+                the ``mlflow.sklearn.SERIALIZATION_FORMAT_SKOPS`` format.
+        """
+        if serialization_format == SERIALIZATION_FORMAT_SKOPS:
+            import skops.io
+            from skops.io.exceptions import UntrustedTypesFoundException
+    
+            try:
+                skops.io.dump(sk_model, output_path)
+>               skops.io.load(output_path, trusted=skops_trusted_types)
+
+..\v1\Lib\site-packages\mlflow\sklearn\__init__.py:706: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+file = 'C:\\Users\\abhir\\AppData\\Local\\Temp\\tmpd3s14cfq\\model\\model.skops'
+trusted = None
+
+    def load(file: str | Path | BinaryIO, trusted: TrustedTypes | None = None) -> Any:
+        """Load an object saved with the skops persistence format.
+    
+        Skops aims at providing a secure persistence feature that does not rely on
+        :mod:`pickle`, which is inherently insecure. For more information, please
+        visit the :ref:`persistence` documentation.
+    
+        Parameters
+        ----------
+        file: str, path, or file-like object
+            The file name or a binary file object of the dumped object to load.
+    
+        trusted: list of str or type, default=None
+            The object will be loaded only if there are only trusted objects and
+            objects of types listed in ``trusted`` in the dumped file. Types can be
+            given by their fully qualified name, as returned by
+            :func:`~skops.io.get_untrusted_types`, or as the type itself.
+    
+        Returns
+        -------
+        instance: object
+            The loaded object.
+    
+        """
+        if trusted is True:
+            raise TypeError(
+                "trusted must be a list of strings or types. Before version 0.10 "
+                "trusted could be a boolean, but this is no longer supported, due to "
+                "a reported CVE-2024-37065. You can pass the output of "
+                "`get_untrusted_types` as trusted to load the data. Be sure to review "
+                "the output of the function before passing it as trusted."
+            )
+    
+        with ZipFile(file, "r") as input_zip:
+            schema, load_context = read_schema(input_zip)
+            tree = get_tree(schema, load_context, trusted=trusted)
+>           audit_tree(tree, trusted=trusted)
+
+..\v1\Lib\site-packages\skops\io\_persist.py:152: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+tree = <skops.io._general.ObjectNode object at 0x0000025D69AD0490>
+trusted = None
+
+    def audit_tree(tree: Node, trusted: TrustedTypes | None) -> None:
+        """Audit a tree of nodes.
+    
+        A tree is safe if it only contains trusted types.
+    
+        Parameters
+        ----------
+        tree : skops.io._dispatch.Node
+            The tree to audit.
+    
+        trusted : list of str or type, or None
+            The types trusted in addition to the ones trusted by default, given by
+            their fully qualified name or as the type itself.
+    
+        Raises
+        ------
+        UntrustedTypesFoundException
+            If the tree contains an untrusted type.
+        """
+        unsafe = tree.get_unsafe_set() - set(get_type_paths(trusted))
+        if unsafe:
+>           raise UntrustedTypesFoundException(unsafe)
+E           skops.io.exceptions.UntrustedTypesFoundException: Untrusted types found in the file: ['sklearn.tree._tree.Tree'].
+E           
+E           - sklearn.tree._tree.Tree: sklearn.tree._tree.Tree (the shared node storage for DecisionTree*, RandomForest*, ExtraTrees*, and GradientBoosting* models) stores raw node indices (left_child, right_child, feature) that scikit-learn indexes into without bounds checking. A malicious file can set these to out-of-range values: skops loads the object successfully, but calling .predict() on it can then crash the process (segfault) or read out-of-bounds memory. If you created the file yourself or otherwise fully trust its source, you can load it with trusted=["sklearn.tree._tree.Tree"].
+E           
+E           Only add the specific types you have reviewed and trust to the `trusted` argument; avoid passing everything reported by get_untrusted_types() just to make a file load.
+
+..\v1\Lib\site-packages\skops\io\_audit.py:63: UntrustedTypesFoundException
+
+During handling of the above exception, another exception occurred:
+
+    def test_train_and_register_model_execution():
+        """Test model training and verification of MLflow run logging."""
+        # Ensure tracking URI matches pipeline setup
+        mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    
+        # Execute retraining step
+>       train_and_register_model()
+
+tests\test_retrain.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    def train_and_register_model():
+    
+        print("Initiating retraining process...")
+    
+        iris = load_iris()
+    
+        X_train, X_test, y_train, y_test = train_test_split(
+            iris.data,
+            iris.target,
+            test_size=0.2,
+            random_state=42
+        )
+    
+        # Check existing promoted model
+        baseline_accuracy = None
+    
+        try:
+            baseline = mlflow.sklearn.load_model(
+                f"models:/{MODEL_NAME}@champion"
+            )
+    
+            baseline_predictions = baseline.predict(X_test)
+            baseline_accuracy = accuracy_score(
+                y_test, baseline_predictions
+            )
+    
+            print(f"Current champion accuracy: {baseline_accuracy:.4f}")
+    
+        except Exception:
+            print("No existing champion model. First promotion is possible.")
+    
+        with mlflow.start_run(run_name="automated_retrain_run"):
+    
+            n_estimators = 100
+            max_depth = 5
+    
+            model = RandomForestClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                random_state=42
+            )
+    
+            model.fit(X_train, y_train)
+    
+            predictions = model.predict(X_test)
+            accuracy = accuracy_score(y_test, predictions)
+    
+            mlflow.log_param("n_estimators", n_estimators)
+            mlflow.log_param("max_depth", max_depth)
+            mlflow.log_param("trigger", "data_drift")
+            mlflow.log_metric("accuracy", accuracy)
+    
+            print(f"Candidate Model Accuracy: {accuracy:.4f}")
+    
+            # Quality gate
+            if accuracy < ACCURACY_THRESHOLD:
+                print("Quality threshold failed. Promotion skipped.")
+                return
+    
+            # Compare candidate with current champion
+            if (
+                baseline_accuracy is not None
+                and accuracy <= baseline_accuracy
+            ):
+                print("Candidate did not outperform champion. Promotion skipped.")
+                return
+    
+            # Register candidate
+>           mlflow.sklearn.log_model(
+                sk_model=model,
+                artifact_path="model",
+                registered_model_name=MODEL_NAME
+            )
+
+src\retrain_pipeline.py:93: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+sk_model = RandomForestClassifier(max_depth=5, random_state=42)
+artifact_path = 'model', conda_env = None, code_paths = None
+serialization_format = 'skops', registered_model_name = 'IrisRandomForestModel'
+signature = None, input_example = None, await_registration_for = 300
+pip_requirements = None, extra_pip_requirements = None
+pyfunc_predict_fn = 'predict', metadata = None, extra_files = None
+params = None, tags = None, model_type = None, step = 0, model_id = None
+name = None, skops_trusted_types = None, kwargs = {}
+
+    @format_docstring(LOG_MODEL_PARAM_DOCS.format(package_name="scikit-learn"))
+    def log_model(
+        sk_model,
+        artifact_path: str | None = None,
+        conda_env=None,
+        code_paths=None,
+        serialization_format=None,
+        registered_model_name=None,
+        signature: ModelSignature = None,
+        input_example: ModelInputExample = None,
+        await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
+        pip_requirements=None,
+        extra_pip_requirements=None,
+        pyfunc_predict_fn="predict",
+        metadata=None,
+        extra_files=None,
+        params: dict[str, Any] | None = None,
+        tags: dict[str, Any] | None = None,
+        model_type: str | None = None,
+        step: int = 0,
+        model_id: str | None = None,
+        name: str | None = None,
+        skops_trusted_types: list[str] | None = None,
+        **kwargs,
+    ):
+        """
+        Log a scikit-learn model as an MLflow artifact for the current run. Produces an MLflow Model
+        containing the following flavors:
+    
+            - :py:mod:`mlflow.sklearn`
+            - :py:mod:`mlflow.pyfunc`. NOTE: This flavor is only included for scikit-learn models
+              that define `predict()`, since `predict()` is required for pyfunc model inference.
+    
+        Args:
+            sk_model: scikit-learn model to be saved.
+            artifact_path: Deprecated. Use `name` instead.
+            conda_env: {{ conda_env }}
+            code_paths: {{ code_paths }}
+            serialization_format: The format in which to serialize the model. This should be one of
+                the formats "skops", "cloudpickle" or "pickle".
+                If not specified, the model is serialized as "cloudpickle" in Databricks Runtime or
+                when using a Databricks tracking URI, and as "skops" otherwise.
+                The "skops" format guarantees safe deserialization.
+                The "cloudpickle" format, provides better cross-system compatibility by identifying and
+                packaging code dependencies with the serialized model, but requires exercising
+                caution because these formats rely on Python's object serialization mechanism,
+                which can execute arbitrary code during deserialization.
+            registered_model_name: If given, create a model version under
+                ``registered_model_name``, also creating a registered model if one
+                with the given name does not exist.
+            signature: {{ signature }}
+            input_example: {{ input_example }}
+            await_registration_for: Number of seconds to wait for the model version to finish
+                being created and is in ``READY`` status. By default, the function
+                waits for five minutes. Specify 0 or None to skip waiting.
+            pip_requirements: {{ pip_requirements }}
+            extra_pip_requirements: {{ extra_pip_requirements }}
+            pyfunc_predict_fn: The name of the prediction function to use for inference with the
+                pyfunc representation of the resulting MLflow Model. Current supported functions
+                are: ``"predict"``, ``"predict_proba"``, ``"predict_log_proba"``,
+                ``"predict_joint_log_proba"``, and ``"score"``.
+            metadata: {{ metadata }}
+            extra_files: {{ extra_files }}
+            params: {{ params }}
+            tags: {{ tags }}
+            model_type: {{ model_type }}
+            step: {{ step }}
+            model_id: {{ model_id }}
+            name: {{ name }}
+            skops_trusted_types: A list of trusted types when loading model that is saved as
+                the ``mlflow.sklearn.SERIALIZATION_FORMAT_SKOPS`` format.
+            kwargs: Extra arguments to pass to :py:func:`mlflow.models.Model.log`.
+    
+        Returns:
+            A :py:class:`ModelInfo <mlflow.models.model.ModelInfo>` instance that contains the
+            metadata of the logged model.
+    
+        .. code-block:: python
+            :caption: Example
+    
+            import mlflow
+            import mlflow.sklearn
+            from mlflow.models import infer_signature
+            from sklearn.datasets import load_iris
+            from sklearn import tree
+    
+            with mlflow.start_run():
+                # load dataset and train model
+                iris = load_iris()
+                sk_model = tree.DecisionTreeClassifier()
+                sk_model = sk_model.fit(iris.data, iris.target)
+    
+                # log model params
+                mlflow.log_param("criterion", sk_model.criterion)
+                mlflow.log_param("splitter", sk_model.splitter)
+                signature = infer_signature(iris.data, sk_model.predict(iris.data))
+    
+                # log model
+                mlflow.sklearn.log_model(sk_model, name="sk_models", signature=signature)
+    
+        """
+        if serialization_format is None:
+            serialization_format = _get_default_serialization_format()
+    
+>       return Model.log(
+            artifact_path=artifact_path,
+            name=name,
+            flavor=mlflow.sklearn,
+            sk_model=sk_model,
+            conda_env=conda_env,
+            code_paths=code_paths,
+            serialization_format=serialization_format,
+            registered_model_name=registered_model_name,
+            signature=signature,
+            input_example=input_example,
+            await_registration_for=await_registration_for,
+            pip_requirements=pip_requirements,
+            extra_pip_requirements=extra_pip_requirements,
+            pyfunc_predict_fn=pyfunc_predict_fn,
+            metadata=metadata,
+            extra_files=extra_files,
+            params=params,
+            tags=tags,
+            model_type=model_type,
+            step=step,
+            model_id=model_id,
+            skops_trusted_types=skops_trusted_types,
+            **kwargs,
+        )
+
+..\v1\Lib\site-packages\mlflow\sklearn\__init__.py:497: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (<class 'mlflow.models.model.Model'>,)
+kwargs = {'artifact_path': 'model', 'name': None, 'flavor': <module 'mlflow.sklearn' from 'C:\\Users\\abhir\\project\\v1\\Lib\\site-packages\\mlflow\\sklearn\\__init__.py'>, 'sk_model': RandomForestClassifier(max_depth=5, random_state=42), ...}
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        if is_telemetry_disabled() or _is_telemetry_disabled_for_event(event):
+            return func(*args, **kwargs)
+    
+        status = Status.SUCCESS
+        result = None
+        start_time = time.time()
+        try:
+>           result = func(*args, **kwargs)
+                     ^^^^^^^^^^^^^^^^^^^^^
+
+..\v1\Lib\site-packages\mlflow\telemetry\track.py:32: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cls = <class 'mlflow.models.model.Model'>, artifact_path = 'model'
+flavor = <module 'mlflow.sklearn' from 'C:\\Users\\abhir\\project\\v1\\Lib\\site-packages\\mlflow\\sklearn\\__init__.py'>
+registered_model_name = 'IrisRandomForestModel', await_registration_for = 300
+metadata = None, run_id = '19a60c8f042846c58f9501612b008bd0', resources = None
+auth_policy = None, prompts = None, name = 'model', model_type = None
+params = {'n_estimators': '100', 'max_depth': '5', 'trigger': 'data_drift'}
+tags = None, step = 0, model_id = None
+kwargs = {'sk_model': RandomForestClassifier(max_depth=5, random_state=42), 'conda_env': None, 'code_paths': None, 'serialization_format': 'skops', ...}
+
+    @format_docstring(LOG_MODEL_PARAM_DOCS)
+    @classmethod
+    @record_usage_event(LogModelEvent)
+    def log(
+        cls,
+        artifact_path,
+        flavor,
+        registered_model_name=None,
+        await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
+        metadata=None,
+        run_id=None,
+        resources=None,
+        auth_policy=None,
+        prompts=None,
+        name: str | None = None,
+        model_type: str | None = None,
+        params: dict[str, Any] | None = None,
+        tags: dict[str, Any] | None = None,
+        step: int = 0,
+        model_id: str | None = None,
+        **kwargs,
+    ) -> ModelInfo:
+        """
+        Log model using supplied flavor module. If no run is active, this method will create a new
+        active run.
+    
+        Args:
+            artifact_path: Deprecated. Use `name` instead.
+            flavor: Flavor module to save the model with. The module must have
+                the ``save_model`` function that will persist the model as a valid
+                MLflow model.
+            registered_model_name: If given, create a model version under
+                ``registered_model_name``, also creating a registered model if
+                one with the given name does not exist.
+            await_registration_for: Number of seconds to wait for the model version to finish
+                being created and is in ``READY`` status. By default, the
+                function waits for five minutes. Specify 0 or None to skip
+                waiting.
+            metadata: {{ metadata }}
+            run_id: The run ID to associate with this model.
+            resources: {{ resources }}
+            auth_policy: {{ auth_policy }}
+            prompts: {{ prompts }}
+            name: The name of the model.
+            model_type: {{ model_type }}
+            params: {{ params }}
+            tags: {{ tags }}
+            step: {{ step }}
+            model_id: {{ model_id }}
+            kwargs: Extra args passed to the model flavor.
+    
+        Returns:
+            A :py:class:`ModelInfo <mlflow.models.model.ModelInfo>` instance that contains the
+            metadata of the logged model.
+        """
+        if name is not None and artifact_path is not None:
+            raise MlflowException.invalid_parameter_value(
+                "Both `artifact_path` (deprecated) and `name` parameters were specified. "
+                "Please only specify `name`."
+            )
+        elif artifact_path is not None:
+            _logger.warning("`artifact_path` is deprecated. Please use `name` instead.")
+    
+        name = name or artifact_path
+    
+        def log_model_metrics_for_step(client, model_id, run_id, step):
+            metric_names = client.get_run(run_id).data.metrics.keys()
+            metrics_for_step = []
+            for metric_name in metric_names:
+                history = client.get_metric_history(run_id, metric_name)
+                metrics_for_step.extend([
+                    Metric(
+                        key=metric.key,
+                        value=metric.value,
+                        timestamp=metric.timestamp,
+                        step=metric.step,
+                        dataset_name=metric.dataset_name,
+                        dataset_digest=metric.dataset_digest,
+                        run_id=metric.run_id,
+                        model_id=model_id,
+                    )
+                    for metric in history
+                    if metric.step == step and metric.model_id is None
+                ])
+            client.log_batch(run_id=run_id, metrics=metrics_for_step)
+    
+        # Only one of Auth policy and resources should be defined
+    
+        if resources is not None and auth_policy is not None:
+            raise ValueError("Only one of `resources`, and `auth_policy` can be specified.")
+    
+        registered_model = None
+        with TempDir() as tmp:
+            local_path = tmp.path("model")
+    
+            tracking_uri = _resolve_tracking_uri()
+            client = mlflow.MlflowClient(tracking_uri)
+            if not run_id:
+                run_id = active_run.info.run_id if (active_run := mlflow.active_run()) else None
+    
+            flavor_name = kwargs.pop("flavor_name", None)
+            if model_id is not None:
+                model = client.get_logged_model(model_id)
+            else:
+                params = {
+                    **(params or {}),
+                    **(client.get_run(run_id).data.params if run_id else {}),
+                }
+                if flavor_name is None:
+                    flavor_name = flavor.__name__ if hasattr(flavor, "__name__") else "custom"
+                model = _create_logged_model(
+                    # TODO: Update model name
+                    name=name,
+                    source_run_id=run_id,
+                    model_type=model_type,
+                    params={key: str(value) for key, value in params.items()},
+                    tags={key: str(value) for key, value in tags.items()}
+                    if tags is not None
+                    else None,
+                    flavor=flavor_name,
+                    serialization_format=kwargs.get("serialization_format"),
+                    uses_uv=kwargs.get("uv_project_path") is not None or _is_uv_auto_detected(),
+                )
+                _last_logged_model_id.set(model.model_id)
+                if (
+                    MLFLOW_PRINT_MODEL_URLS_ON_CREATION.get()
+                    and is_databricks_uri(tracking_uri)
+                    and (workspace_url := get_workspace_url())
+                ):
+                    logged_model_url = _construct_databricks_logged_model_url(
+                        workspace_url,
+                        model.experiment_id,
+                        model.model_id,
+                        get_workspace_id(),
+                    )
+                    eprint(f"\U0001f517 View Logged Model at: {logged_model_url}")
+    
+            with _use_logged_model(model=model):
+                if run_id is not None:
+                    model_output = LoggedModelOutput(model.model_id, step=step)
+                    client.log_outputs(run_id=run_id, models=[model_output])
+                    # Update in-memory active run outputs to keep cached state in sync
+                    active_run = mlflow.active_run()
+                    if active_run is not None and active_run.info.run_id == run_id:
+                        if active_run.outputs is None:
+                            active_run._outputs = RunOutputs(model_outputs=[model_output])
+                        else:
+                            active_run.outputs.model_outputs.append(model_output)
+                    log_model_metrics_for_step(
+                        client=client, model_id=model.model_id, run_id=run_id, step=step
+                    )
+    
+                if prompts is not None:
+                    # Convert to URIs for serialization
+                    prompts = [pr.uri if isinstance(pr, PromptVersion) else pr for pr in prompts]
+    
+                mlflow_model = cls(
+                    artifact_path=model.artifact_location,
+                    model_uuid=model.model_id,
+                    run_id=run_id,
+                    metadata=metadata,
+                    resources=resources,
+                    auth_policy=auth_policy,
+                    prompts=prompts,
+                    model_id=model.model_id,
+                )
+>               flavor.save_model(path=local_path, mlflow_model=mlflow_model, **kwargs)
+
+..\v1\Lib\site-packages\mlflow\models\model.py:1228: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+sk_model = RandomForestClassifier(max_depth=5, random_state=42)
+path = 'C:\\Users\\abhir\\AppData\\Local\\Temp\\tmpd3s14cfq\\model'
+conda_env = None, code_paths = None
+mlflow_model = <mlflow.models.model.Model object at 0x0000025D68F85810>
+serialization_format = 'skops', signature = None, input_example = None
+pip_requirements = None, extra_pip_requirements = None
+pyfunc_predict_fn = 'predict', metadata = None, skops_trusted_types = None
+extra_files = None
+
+    @format_docstring(LOG_MODEL_PARAM_DOCS.format(package_name="scikit-learn"))
+    def save_model(
+        sk_model,
+        path,
+        conda_env=None,
+        code_paths=None,
+        mlflow_model=None,
+        serialization_format=None,
+        signature: ModelSignature = None,
+        input_example: ModelInputExample = None,
+        pip_requirements=None,
+        extra_pip_requirements=None,
+        pyfunc_predict_fn="predict",
+        metadata=None,
+        skops_trusted_types=None,
+        extra_files=None,
+    ):
+        """
+        Save a scikit-learn model to a path on the local file system. Produces a MLflow Model
+        containing the following flavors:
+    
+            - :py:mod:`mlflow.sklearn`
+            - :py:mod:`mlflow.pyfunc`. NOTE: This flavor is only included for scikit-learn models
+              that define `predict()`, since `predict()` is required for pyfunc model inference.
+    
+        Args:
+            sk_model: scikit-learn model to be saved.
+            path: Local path where the model is to be saved.
+            conda_env: {{ conda_env }}
+            code_paths: {{ code_paths }}
+            mlflow_model: :py:mod:`mlflow.models.Model` this flavor is being added to.
+            serialization_format: The format in which to serialize the model. This should be one of
+                the formats "skops", "cloudpickle" or "pickle".
+                If not specified, the model is serialized as "cloudpickle" in Databricks Runtime or
+                when using a Databricks tracking URI, and as "skops" otherwise.
+                The "skops" format guarantees safe deserialization.
+                The "cloudpickle" format, provides better cross-system compatibility by identifying and
+                packaging code dependencies with the serialized model, but requires exercising
+                caution because these formats rely on Python's object serialization mechanism,
+                which can execute arbitrary code during deserialization.
+    
+            signature: {{ signature }}
+            input_example: {{ input_example }}
+            pip_requirements: {{ pip_requirements }}
+            extra_pip_requirements: {{ extra_pip_requirements }}
+            pyfunc_predict_fn: The name of the prediction function to use for inference with the
+                pyfunc representation of the resulting MLflow Model. Current supported functions
+                are: ``"predict"``, ``"predict_proba"``, ``"predict_log_proba"``,
+                ``"predict_joint_log_proba"``, and ``"score"``.
+            metadata: {{ metadata }}
+            skops_trusted_types: A list of trusted types when loading model that is saved as
+                the ``mlflow.sklearn.SERIALIZATION_FORMAT_SKOPS`` format.
+            extra_files: {{ extra_files }}
+    
+        .. code-block:: python
+            :caption: Example
+    
+            import mlflow.sklearn
+            from sklearn.datasets import load_iris
+            from sklearn import tree
+    
+            iris = load_iris()
+            sk_model = tree.DecisionTreeClassifier()
+            sk_model = sk_model.fit(iris.data, iris.target)
+    
+            # Save the model in cloudpickle format
+            # set path to location for persistence
+            sk_path_dir_1 = ...
+            mlflow.sklearn.save_model(
+                sk_model,
+                sk_path_dir_1,
+                serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+            )
+    
+            # save the model in pickle format
+            # set path to location for persistence
+            sk_path_dir_2 = ...
+            mlflow.sklearn.save_model(
+                sk_model,
+                sk_path_dir_2,
+                serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_PICKLE,
+            )
+        """
+        import sklearn
+    
+        _validate_env_arguments(conda_env, pip_requirements, extra_pip_requirements)
+    
+        if serialization_format is None:
+            serialization_format = _get_default_serialization_format()
+    
+        if serialization_format not in SUPPORTED_SERIALIZATION_FORMATS:
+            raise MlflowException(
+                message=(
+                    f"Unrecognized serialization format: {serialization_format}. Please specify one"
+                    f" of the following supported formats: {SUPPORTED_SERIALIZATION_FORMATS}."
+                ),
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+    
+        if serialization_format != SERIALIZATION_FORMAT_SKOPS and not is_in_databricks_runtime():
+            _logger.warning(
+                "Saving scikit-learn models in the pickle or cloudpickle format requires exercising "
+                "caution because these formats rely on Python's object serialization mechanism, "
+                "which can execute arbitrary code during deserialization. "
+                "The recommended safe alternative is the 'skops' format. "
+                "For more information, see: https://scikit-learn.org/stable/model_persistence.html",
+            )
+    
+        _validate_and_prepare_target_save_path(path)
+        code_path_subdir = _validate_and_copy_code_paths(code_paths, path)
+    
+        if mlflow_model is None:
+            mlflow_model = Model()
+        saved_example = _save_example(mlflow_model, input_example, path)
+    
+        if signature is None and saved_example is not None:
+            wrapped_model = _SklearnModelWrapper(sk_model)
+            signature = _infer_signature_from_input_example(saved_example, wrapped_model)
+        elif signature is False:
+            signature = None
+    
+        if signature is not None:
+            mlflow_model.signature = signature
+        if metadata is not None:
+            mlflow_model.metadata = metadata
+    
+        if serialization_format == SERIALIZATION_FORMAT_SKOPS:
+            model_data_subpath = _SKOPS_MODEL_DATA_SUBPATH
+        else:
+            model_data_subpath = _PICKLE_MODEL_DATA_SUBPATH
+        model_data_path = os.path.join(path, model_data_subpath)
+>       _save_model(
+            sk_model=sk_model,
+            output_path=model_data_path,
+            serialization_format=serialization_format,
+            skops_trusted_types=skops_trusted_types,
+        )
+
+..\v1\Lib\site-packages\mlflow\sklearn\__init__.py:315: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+sk_model = RandomForestClassifier(max_depth=5, random_state=42)
+output_path = 'C:\\Users\\abhir\\AppData\\Local\\Temp\\tmpd3s14cfq\\model\\model.skops'
+serialization_format = 'skops', skops_trusted_types = None
+
+    def _save_model(sk_model, output_path, serialization_format, skops_trusted_types):
+        """
+        Args:
+            sk_model: The scikit-learn model to serialize.
+            output_path: The file path to which to write the serialized model.
+            serialization_format: The format in which to serialize the model. This should be one of
+                the following: ``mlflow.sklearn.SERIALIZATION_FORMAT_PICKLE`` or
+                ``mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE``.
+            skops_trusted_types: A list of trusted types when loading model that is saved as
+                the ``mlflow.sklearn.SERIALIZATION_FORMAT_SKOPS`` format.
+        """
+        if serialization_format == SERIALIZATION_FORMAT_SKOPS:
+            import skops.io
+            from skops.io.exceptions import UntrustedTypesFoundException
+    
+            try:
+                skops.io.dump(sk_model, output_path)
+                skops.io.load(output_path, trusted=skops_trusted_types)
+            except UntrustedTypesFoundException as e:
+                shutil.rmtree(output_path, ignore_errors=True)
+>               raise MlflowException(
+                    "The saved sklearn model references untrusted types. "
+                    "If you are sure loading these types is safe, "
+                    "set the 'skops_trusted_types' parameter when calling 'log_model' or 'save_model' "
+                    "to the list of trusted types. "
+                    f"Root error: {e!s}"
+                )
+E               mlflow.exceptions.MlflowException: The saved sklearn model references untrusted types. If you are sure loading these types is safe, set the 'skops_trusted_types' parameter when calling 'log_model' or 'save_model' to the list of trusted types. Root error: Untrusted types found in the file: ['sklearn.tree._tree.Tree'].
+E               
+E               - sklearn.tree._tree.Tree: sklearn.tree._tree.Tree (the shared node storage for DecisionTree*, RandomForest*, ExtraTrees*, and GradientBoosting* models) stores raw node indices (left_child, right_child, feature) that scikit-learn indexes into without bounds checking. A malicious file can set these to out-of-range values: skops loads the object successfully, but calling .predict() on it can then crash the process (segfault) or read out-of-bounds memory. If you created the file yourself or otherwise fully trust its source, you can load it with trusted=["sklearn.tree._tree.Tree"].
+E               
+E               Only add the specific types you have reviewed and trust to the `trusted` argument; avoid passing everything reported by get_untrusted_types() just to make a file load.
+
+..\v1\Lib\site-packages\mlflow\sklearn\__init__.py:709: MlflowException
+---------------------------- Captured stdout call -----------------------------
+Initiating retraining process...
+No existing champion model. First promotion is possible.
+Candidate Model Accuracy: 1.0000
+---------------------------- Captured stderr call -----------------------------
+2026/11/17 16:41:26 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+------------------------------ Captured log call ------------------------------
+WARNING  mlflow.models.model:model.py:1123 `artifact_path` is deprecated. Please use `name` instead.
+============================== warnings summary ===============================
+..\v1\Lib\site-packages\mlflow\store\tracking\sqlalchemy_store.py:356
+  C:\Users\abhir\project\v1\Lib\site-packages\mlflow\store\tracking\sqlalchemy_store.py:356: SADeprecationWarning: The ``noload`` loader strategy is deprecated and will be removed in a future release.  This option produces incorrect results by returning ``None`` for related items. (deprecated since: 2.1)
+    sqlalchemy.orm.configure_mappers()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_retrain.py::test_train_and_register_model_execution - mlflow.exceptions.MlflowException: The saved sklearn model references untrusted types. If you are sure loading these types is safe, set the 'skops_trusted_types' parameter when calling 'log_model' or 'save_model' to the list of trusted types. Root error: Untrusted types found in the file: ['sklearn.tree._tree.Tree'].
+
+- sklearn.tree._tree.Tree: sklearn.tree._tree.Tree (the shared node storage for DecisionTree*, RandomForest*, ExtraTrees*, and GradientBoosting* models) stores raw node indices (left_child, right_child, feature) that scikit-learn indexes into without bounds checking. A malicious file can set these to out-of-range values: skops loads the object successfully, but calling .predict() on it can then crash the process (segfault) or read out-of-bounds memory. If you created the file yourself or otherwise fully trust its source, you can load it with trusted=["sklearn.tree._tree.Tree"].
+
+Only add the specific types you have reviewed and trust to the `trusted` argument; avoid passing everything reported by get_untrusted_types() just to make a file load.
+======================== 1 failed, 1 warning in 6.32s =========================
